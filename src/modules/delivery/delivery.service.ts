@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -18,6 +18,7 @@ import { Espace } from '../espaces/espace.entity';
 import { EspaceType } from '../espaces/espace-type.enum';
 import { UsersService } from '../users/users.service';
 import { NotificationsService } from '../notifications/notifications.service';
+
 export interface DeliveryBadgeInfo {
   completedDeliveries: number;
   averageRating: number | null;
@@ -41,11 +42,11 @@ export class DeliveryService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-   async createRequest(
+  async createRequest(
     clientId: string,
     dto: CreateDeliveryRequestDto,
   ): Promise<DeliveryRequest> {
-       const request = this.requestsRepository.create({
+    const request = this.requestsRepository.create({
       clientId,
       depart: dto.depart,
       destination: dto.destination,
@@ -56,10 +57,6 @@ export class DeliveryService {
     });
     const saved = await this.requestsRepository.save(request);
 
-    // Notifie tous les propriétaires d'agence de livraison — ce sont
-    // eux qui gèrent la tarification et voient les demandes ouvertes
-    // sur leur tableau de bord (voir EspacesModule.findPublic côté
-    // mobile pour la liste affichée).
     const agencies = await this.espacesRepository.find({
       where: { type: EspaceType.AGENCE_LIVRAISON },
     });
@@ -70,7 +67,7 @@ export class DeliveryService {
       this.notificationsService.send(
         ownerId,
         'Nouvelle demande de livraison',
-        `${dto.depart} → ${dto.destination}`,
+        `${dto.depart} vers ${dto.destination}`,
       );
     }
 
@@ -147,7 +144,7 @@ export class DeliveryService {
       espaceId = espace.id;
     }
 
-   const offer = this.offersRepository.create({
+    const offer = this.offersRepository.create({
       deliveryRequestId: requestId,
       providerId,
       price: dto.price,
@@ -159,7 +156,7 @@ export class DeliveryService {
     this.notificationsService.send(
       request.clientId,
       'Nouvelle offre de livraison',
-      `Une offre de ${Number(dto.price).toLocaleString('fr-FR')} F a été proposée pour ta livraison.`,
+      `Une offre de ${Number(dto.price).toLocaleString('fr-FR')} F a ete proposee pour ta livraison.`,
     );
 
     return saved;
@@ -183,7 +180,7 @@ export class DeliveryService {
       throw new ForbiddenException('Cette demande ne t\'appartient pas');
     }
     if (request.status !== DeliveryRequestStatus.OPEN) {
-      throw new BadRequestException('Cette demande a déjà été traitée');
+      throw new BadRequestException('Cette demande a deja ete traitee');
     }
 
     const offer = await this.offersRepository.findOne({
@@ -201,14 +198,15 @@ export class DeliveryService {
       { id: offerId },
       { status: DeliveryOfferStatus.ACCEPTED },
     );
-request.status = DeliveryRequestStatus.ASSIGNED;
+
+    request.status = DeliveryRequestStatus.ASSIGNED;
     request.acceptedOfferId = offerId;
     const saved = await this.requestsRepository.save(request);
 
     this.notificationsService.send(
       offer.providerId,
-      'Offre acceptée',
-      'Ton offre de livraison a été acceptée !',
+      'Offre acceptee',
+      'Ton offre de livraison a ete acceptee !',
     );
 
     return saved;
@@ -221,24 +219,24 @@ request.status = DeliveryRequestStatus.ASSIGNED;
   ): Promise<DeliveryRequest> {
     const request = await this.findRequestById(requestId);
     if (!request.acceptedOfferId) {
-      throw new BadRequestException('Aucune offre acceptée pour cette demande');
+      throw new BadRequestException('Aucune offre acceptee pour cette demande');
     }
     const offer = await this.offersRepository.findOne({
       where: { id: request.acceptedOfferId },
     });
     if (!offer || !offer.espaceId) {
-      throw new BadRequestException('Cette livraison n\'a pas été proposée par une agence');
+      throw new BadRequestException('Cette livraison n\'a pas ete proposee par une agence');
     }
     const espace = await this.espacesRepository.findOne({ where: { id: offer.espaceId } });
     if (!espace || espace.ownerId !== agencyOwnerId) {
-      throw new ForbiddenException('Cette livraison ne peut pas être attribuée par toi');
+      throw new ForbiddenException('Cette livraison ne peut pas etre attribuee par toi');
     }
 
     const membership = await this.agencyMembersRepository.findOne({
       where: { espaceId: espace.id, livreurId, status: 'accepted' },
     });
     if (!membership) {
-      throw new BadRequestException('Ce livreur ne fait pas partie de ton équipe');
+      throw new BadRequestException('Ce livreur ne fait pas partie de ton equipe');
     }
 
     request.assignedLivreurId = livreurId;
@@ -263,10 +261,10 @@ request.status = DeliveryRequestStatus.ASSIGNED;
 
     const livreur = await this.usersService.findByPhone(phone);
     if (!livreur) {
-      throw new NotFoundException('Aucun utilisateur inscrit avec ce numéro');
+      throw new NotFoundException('Aucun utilisateur inscrit avec ce numero');
     }
     if (livreur.id === agencyOwnerId) {
-      throw new BadRequestException('Tu ne peux pas t\'inviter toi-même');
+      throw new BadRequestException('Tu ne peux pas t\'inviter toi-meme');
     }
 
     const existing = await this.agencyMembersRepository.findOne({
@@ -275,8 +273,8 @@ request.status = DeliveryRequestStatus.ASSIGNED;
     if (existing) {
       throw new BadRequestException(
         existing.status === 'accepted'
-          ? 'Ce livreur fait déjà partie de ton équipe'
-          : 'Une invitation est déjà en attente pour ce livreur',
+          ? 'Ce livreur fait deja partie de ton equipe'
+          : 'Une invitation est deja en attente pour ce livreur',
       );
     }
 
@@ -289,8 +287,8 @@ request.status = DeliveryRequestStatus.ASSIGNED;
 
     this.notificationsService.send(
       livreur.id,
-      'Invitation à rejoindre une équipe',
-      `${espace.name} t'invite à rejoindre son équipe de livreurs.`,
+      'Invitation a rejoindre une equipe',
+      `${espace.name} t'invite a rejoindre son equipe de livreurs.`,
     );
 
     return saved;
@@ -316,10 +314,10 @@ request.status = DeliveryRequestStatus.ASSIGNED;
       throw new NotFoundException('Invitation introuvable');
     }
     if (membership.livreurId !== livreurId) {
-      throw new ForbiddenException('Cette invitation ne t\'est pas destinée');
+      throw new ForbiddenException('Cette invitation ne t\'est pas destinee');
     }
     if (membership.status !== 'pending') {
-      throw new BadRequestException('Cette invitation a déjà été traitée');
+      throw new BadRequestException('Cette invitation a deja ete traitee');
     }
 
     if (accept) {
@@ -359,7 +357,7 @@ request.status = DeliveryRequestStatus.ASSIGNED;
       throw new ForbiddenException('Cette demande ne t\'appartient pas');
     }
     if (request.status !== DeliveryRequestStatus.ASSIGNED) {
-      throw new BadRequestException('Cette livraison ne peut pas encore être marquée comme reçue');
+      throw new BadRequestException('Cette livraison ne peut pas encore etre marquee comme recue');
     }
     request.status = DeliveryRequestStatus.COMPLETED;
     return this.requestsRepository.save(request);
@@ -372,25 +370,25 @@ request.status = DeliveryRequestStatus.ASSIGNED;
     }
     if (request.status !== DeliveryRequestStatus.COMPLETED) {
       throw new BadRequestException(
-        'Tu ne peux noter le livreur qu\'une fois le colis marqué comme reçu',
+        'Tu ne peux noter le livreur qu\'une fois le colis marque comme recu',
       );
     }
     if (!request.acceptedOfferId) {
-      throw new BadRequestException('Aucune offre acceptée pour cette demande');
+      throw new BadRequestException('Aucune offre acceptee pour cette demande');
     }
 
     const existing = await this.reviewsRepository.findOne({
       where: { deliveryRequestId: dto.deliveryRequestId },
     });
     if (existing) {
-      throw new BadRequestException('Un avis existe déjà pour cette livraison');
+      throw new BadRequestException('Un avis existe deja pour cette livraison');
     }
 
     const offer = await this.offersRepository.findOne({
       where: { id: request.acceptedOfferId },
     });
     if (!offer) {
-      throw new NotFoundException('Offre acceptée introuvable');
+      throw new NotFoundException('Offre acceptee introuvable');
     }
 
     const providerId = request.assignedLivreurId ?? offer.providerId;
@@ -424,5 +422,44 @@ request.status = DeliveryRequestStatus.ASSIGNED;
         : null;
 
     return { completedDeliveries, averageRating, reviewCount };
+  }
+
+  async getContactInfo(
+    requestId: string,
+    requesterId: string,
+  ): Promise<{ name: string; phone: string; role: 'client' | 'provider' }> {
+    const request = await this.findRequestById(requestId);
+    if (
+      request.status !== DeliveryRequestStatus.ASSIGNED &&
+      request.status !== DeliveryRequestStatus.COMPLETED
+    ) {
+      throw new BadRequestException('Aucun contact disponible pour cette livraison');
+    }
+    if (!request.acceptedOfferId) {
+      throw new BadRequestException('Aucune offre acceptee pour cette livraison');
+    }
+    const offer = await this.offersRepository.findOne({
+      where: { id: request.acceptedOfferId },
+    });
+    if (!offer) {
+      throw new NotFoundException('Offre acceptee introuvable');
+    }
+    const providerId = request.assignedLivreurId ?? offer.providerId;
+
+    if (requesterId === request.clientId) {
+      const provider = await this.usersService.findById(providerId);
+      if (!provider) {
+        throw new NotFoundException('Livreur introuvable');
+      }
+      return { name: provider.fullName, phone: provider.phone, role: 'provider' };
+    }
+    if (requesterId === providerId) {
+      const client = await this.usersService.findById(request.clientId);
+      if (!client) {
+        throw new NotFoundException('Client introuvable');
+      }
+      return { name: client.fullName, phone: client.phone, role: 'client' };
+    }
+    throw new ForbiddenException('Tu n\'es pas concerne par cette livraison');
   }
 }

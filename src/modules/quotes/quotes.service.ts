@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -13,6 +13,7 @@ import { CreateQuoteRequestDto } from './dto/create-quote-request.dto';
 import { SubmitQuoteDto } from './dto/submit-quote.dto';
 import { Espace } from '../espaces/espace.entity';
 import { EspaceType } from '../espaces/espace-type.enum';
+import { User } from '../users/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -24,6 +25,8 @@ export class QuotesService {
     private readonly quotesRepository: Repository<Quote>,
     @InjectRepository(Espace)
     private readonly espacesRepository: Repository<Espace>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -38,15 +41,15 @@ export class QuotesService {
     if (dto.targetEspaceIds && dto.targetEspaceIds.length > 0) {
       const espaces = await this.espacesRepository.findByIds(dto.targetEspaceIds);
       if (espaces.length !== dto.targetEspaceIds.length) {
-        throw new BadRequestException('Une ou plusieurs agences ciblées sont introuvables');
+        throw new BadRequestException('Une ou plusieurs agences ciblees sont introuvables');
       }
       const invalidType = espaces.find((e) => e.type !== dto.targetType);
       if (invalidType) {
-        throw new BadRequestException('Toutes les agences ciblées doivent être du même type');
+        throw new BadRequestException('Toutes les agences ciblees doivent etre du meme type');
       }
       const ownedByClient = espaces.find((e) => e.ownerId === clientId);
       if (ownedByClient) {
-        throw new BadRequestException('Tu ne peux pas te cibler toi-même');
+        throw new BadRequestException('Tu ne peux pas te cibler toi-meme');
       }
       targetEspaceIds = dto.targetEspaceIds;
     }
@@ -60,8 +63,6 @@ export class QuotesService {
     });
     const saved = await this.requestsRepository.save(request);
 
-    // Notifie les agences concernées — soit la liste précise, soit
-    // toutes les agences du bon type si diffusion large.
     const notifyEspaces = targetEspaceIds
       ? await this.espacesRepository.findByIds(targetEspaceIds)
       : await this.espacesRepository.find({ where: { type: dto.targetType } });
@@ -72,7 +73,7 @@ export class QuotesService {
       this.notificationsService.send(
         ownerId,
         'Nouvelle demande de devis',
-        targetEspaceIds ? 'Tu as reçu une demande de devis ciblée.' : 'Nouvelle demande de devis ouverte.',
+        targetEspaceIds ? 'Tu as recu une demande de devis ciblee.' : 'Nouvelle demande de devis ouverte.',
       );
     }
 
@@ -86,8 +87,6 @@ export class QuotesService {
     });
   }
 
-  // Demandes visibles par une agence : celles qui la ciblent
-  // précisément, ou les diffusions larges du bon type.
   async findReceivedRequests(espaceId: string, ownerId: string): Promise<QuoteRequest[]> {
     const espace = await this.espacesRepository.findOne({ where: { id: espaceId } });
     if (!espace || espace.ownerId !== ownerId) {
@@ -161,8 +160,8 @@ export class QuotesService {
 
     this.notificationsService.send(
       request.clientId,
-      'Nouveau devis reçu',
-      `${espace.name} a répondu avec un devis de ${Number(dto.price).toLocaleString('fr-FR')} F.`,
+      'Nouveau devis recu',
+      `${espace.name} a repondu avec un devis de ${Number(dto.price).toLocaleString('fr-FR')} F.`,
     );
 
     return saved;
@@ -174,7 +173,7 @@ export class QuotesService {
       throw new ForbiddenException('Cette demande ne t\'appartient pas');
     }
     if (request.status !== QuoteRequestStatus.OPEN) {
-      throw new BadRequestException('Cette demande a déjà été traitée');
+      throw new BadRequestException('Cette demande a deja ete traitee');
     }
 
     const quote = await this.quotesRepository.findOne({
@@ -191,8 +190,8 @@ export class QuotesService {
 
     this.notificationsService.send(
       quote.espace.ownerId,
-      'Devis accepté',
-      'Ton devis a été accepté par le client.',
+      'Devis accepte',
+      'Ton devis a ete accepte par le client.',
     );
 
     return saved;
@@ -204,7 +203,7 @@ export class QuotesService {
       throw new ForbiddenException('Cette demande ne t\'appartient pas');
     }
     if (request.status !== QuoteRequestStatus.OPEN) {
-      throw new BadRequestException('Cette demande ne peut plus être annulée');
+      throw new BadRequestException('Cette demande ne peut plus etre annulee');
     }
     request.status = QuoteRequestStatus.CANCELLED;
     return this.requestsRepository.save(request);
@@ -213,19 +212,57 @@ export class QuotesService {
   async completeRequest(requestId: string, ownerId: string): Promise<QuoteRequest> {
     const request = await this.findOne(requestId);
     if (!request.acceptedQuoteId) {
-      throw new BadRequestException('Aucun devis accepté pour cette demande');
+      throw new BadRequestException('Aucun devis accepte pour cette demande');
     }
     const acceptedQuote = await this.quotesRepository.findOne({
       where: { id: request.acceptedQuoteId },
     });
-    if (!acceptedQuote || acceptedQuote.espaceId !== ownerId) {
-      // ownerId ici est en fait l'id de l'espace appelant — vérifié côté contrôleur
-    }
     const espace = await this.espacesRepository.findOne({ where: { id: acceptedQuote?.espaceId } });
     if (!espace || espace.ownerId !== ownerId) {
-      throw new ForbiddenException('Cette demande ne t\'est pas destinée');
+      throw new ForbiddenException('Cette demande ne t\'est pas destinee');
     }
     request.status = QuoteRequestStatus.COMPLETED;
     return this.requestsRepository.save(request);
+  }
+
+  async getContactInfo(
+    requestId: string,
+    requesterId: string,
+  ): Promise<{ name: string; phone: string; role: 'client' | 'agency'; agencyName?: string }> {
+    const request = await this.findOne(requestId);
+    if (request.status !== QuoteRequestStatus.ACCEPTED && request.status !== QuoteRequestStatus.COMPLETED) {
+      throw new BadRequestException('Aucun contact disponible pour cette demande');
+    }
+    if (!request.acceptedQuoteId) {
+      throw new BadRequestException('Aucun devis accepte pour cette demande');
+    }
+    const acceptedQuote = await this.quotesRepository.findOne({
+      where: { id: request.acceptedQuoteId },
+      relations: ['espace'],
+    });
+    if (!acceptedQuote) {
+      throw new NotFoundException('Devis accepte introuvable');
+    }
+
+    if (requesterId === request.clientId) {
+      const owner = await this.usersRepository.findOne({ where: { id: acceptedQuote.espace.ownerId } });
+      if (!owner) {
+        throw new NotFoundException('Agence introuvable');
+      }
+      return {
+        name: owner.fullName,
+        phone: owner.phone,
+        role: 'agency',
+        agencyName: acceptedQuote.espace.name,
+      };
+    }
+    if (requesterId === acceptedQuote.espace.ownerId) {
+      const client = await this.usersRepository.findOne({ where: { id: request.clientId } });
+      if (!client) {
+        throw new NotFoundException('Client introuvable');
+      }
+      return { name: client.fullName, phone: client.phone, role: 'client' };
+    }
+    throw new ForbiddenException('Tu n\'es pas concerne par cette demande');
   }
 }

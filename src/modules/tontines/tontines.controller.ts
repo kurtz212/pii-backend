@@ -3,8 +3,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { TontinesService } from './tontines.service';
 import { CreateTontineDto } from './dto/create-tontine.dto';
-import { ProposeOrderDto } from './dto/propose-order.dto';
-import { ValidateCalendarDto } from './dto/validate-calendar.dto';
+import { ProposeCalendarDto } from './dto/propose-order.dto';
+import { RespondToProposalDto } from './dto/respond-to-proposal.dto';
 import { UpdateContributionDto } from './dto/update-contribution.dto';
 
 interface AuthenticatedUser {
@@ -43,22 +43,27 @@ export class TontinesController {
     return { joined: true };
   }
 
-  @Patch(':id/my-order')
-  async proposeOrder(
+  @Post(':id/propose-calendar')
+  async proposeCalendar(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: ProposeOrderDto,
+    @Body() dto: ProposeCalendarDto,
   ) {
-    return this.tontinesService.proposeOrder(id, user.userId, dto.proposedOrder);
+    return this.tontinesService.proposeCalendar(id, user.userId, dto.assignments);
   }
 
-  @Post(':id/validate')
-  async validate(
+  @Post(':id/respond')
+  async respond(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: ValidateCalendarDto,
+    @Body() dto: RespondToProposalDto,
   ) {
-    return this.tontinesService.validateCalendar(id, user.userId, dto.orderedUserIds);
+    return this.tontinesService.respondToProposal(id, user.userId, dto.accept, dto.requestedOrder);
+  }
+
+  @Post(':id/finalize')
+  async finalize(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.tontinesService.finalizeCalendar(id, user.userId);
   }
 
   @Get(':id/contributions')

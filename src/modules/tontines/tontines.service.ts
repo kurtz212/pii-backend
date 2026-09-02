@@ -24,14 +24,18 @@ export class TontinesService {
   ) {}
 
   async create(userId: string, dto: CreateTontineDto): Promise<Tontine> {
-    const tontine = this.tontinesRepository.create({
-      creatorId: userId,
-      name: dto.name,
-      description: dto.description ?? null,
-      contributionAmount: dto.contributionAmount,
-      maxParticipants: dto.maxParticipants,
-      status: TontineStatus.DRAFT,
-    });
+          const tontine = this.tontinesRepository.create({
+        creatorId: userId,
+        name: dto.name,
+        description: dto.description ?? null,
+               articleName: dto.articleName ?? null,
+        articlePrice: dto.articlePrice ?? null,
+        articleImageUrl: dto.articleImageUrl ?? null,
+        confidentialityPolicy: dto.confidentialityPolicy ?? null,
+        contributionAmount: dto.contributionAmount,
+        maxParticipants: dto.maxParticipants,
+        status: TontineStatus.DRAFT,
+      });
     const saved = await this.tontinesRepository.save(tontine);
 
     const membership = this.participantsRepository.create({
@@ -96,70 +100,134 @@ export class TontinesService {
     await this.participantsRepository.save(membership);
   }
 
-  async proposeOrder(tontineId: string, userId: string, proposedOrder: number): Promise<TontineParticipant> {
+    // Le créateur propose (ou re-propose après ajustement) un
+  // calendrier complet — un ordre pour chaque participant inscrit.
+  // Réinitialise la réponse de tout le monde à "pending" à chaque
+  // nouvelle proposition, puisque c'est un nouveau tour.
+  async proposeCalendar(
+    tontineId: string,
+    creatorId: string,
+    assignments: { userId: string; order: number }[],
+  ): Promise<TontineParticipant[]> {
+    const tontine = await this.findOne(tontineId);
+    if (tontine.creatorId !== creatorId) {
+      throw new ForbiddenException('Seul le créateur peut proposer le calendrier');
+    }
+    if (tontine.status !== TontineStatus.DRAFT) {
+      throw new BadRequestException('Cette tontine a déjà démarré');
+    }
+
+    const participants = await this.findParticipants(tontineId);
+    if (participants.length !== tontine.maxParticipants) {
+      throw new BadRequestException(
+        `Il manque des participants : ${participants.length}/${tontine.maxParticipants} inscrits`,
+      );
+    }
+    const participantIds = new Set(participants.map((p) => p.userId));
+
+    if (assignments.length !== participants.length) {
+      throw new BadRequestException(
+        'La proposition doit couvrir exactement tous les participants, chacun une seule fois',
+      );
+    }
+    const seenUsers = new Set<string>();
+    const seenOrders = new Set<number>();
+    for (const a of assignments) {
+      if (!participantIds.has(a.userId) || seenUsers.has(a.userId)) {
+        throw new BadRequestException('Liste de participants invalide');
+      }
+      if (a.order < 1 || a.order > participants.length || seenOrders.has(a.order)) {
+        throw new BadRequestException('Les positions doivent être uniques, de 1 à N');
+      }
+      seenUsers.add(a.userId);
+      seenOrders.add(a.order);
+    }
+
+    for (const a of assignments) {
+      await this.participantsRepository.update(
+        { tontineId, userId: a.userId },
+        { proposedOrder: a.order, requestedOrder: null, responseStatus: 'pending' },
+      );
+    }
+
+    return this.findParticipants(tontineId);
+  }
+
+  // Un participant répond à la proposition en cours : soit il
+  // valide l'ordre proposé, soit il demande un autre ordre.
+  async respondToProposal(
+    tontineId: string,
+    userId: string,
+    accept: boolean,
+    requestedOrder?: number,
+  ): Promise<TontineParticipant> {
     const tontine = await this.findOne(tontineId);
     if (tontine.status !== TontineStatus.DRAFT) {
       throw new BadRequestException('Le calendrier de cette tontine est déjà validé');
     }
     const membership = await this.findMembership(tontineId, userId);
     if (!membership) {
-      throw new ForbiddenException('Rejoins la tontine avant de proposer un ordre');
+      throw new ForbiddenException('Tu ne fais pas partie de cette tontine');
     }
-    membership.proposedOrder = proposedOrder;
+    if (membership.proposedOrder === null) {
+      throw new BadRequestException('Aucune proposition en cours pour cette tontine');
+    }
+
+    if (accept) {
+      membership.responseStatus = 'validated';
+      membership.requestedOrder = null;
+    } else {
+      if (!requestedOrder) {
+        throw new BadRequestException('Précise l\'ordre que tu souhaites à la place');
+      }
+      membership.responseStatus = 'amended';
+      membership.requestedOrder = requestedOrder;
+    }
+
     return this.participantsRepository.save(membership);
   }
 
-  async validateCalendar(
-    tontineId: string,
-    creatorId: string,
-    orderedUserIds: string[],
-  ): Promise<Tontine> {
+  // Le créateur clôture la négociation : le dernier proposedOrder de
+  // chaque participant devient définitif (confirmedOrder), les
+  // cotisations sont générées, la tontine démarre.
+  async finalizeCalendar(tontineId: string, creatorId: string): Promise<Tontine> {
     const tontine = await this.findOne(tontineId);
     if (tontine.creatorId !== creatorId) {
-      throw new ForbiddenException('Seul le créateur peut valider le calendrier');
+      throw new ForbiddenException('Seul le créateur peut finaliser le calendrier');
     }
     if (tontine.status !== TontineStatus.DRAFT) {
       throw new BadRequestException('Cette tontine a déjà été validée');
     }
 
     const participants = await this.findParticipants(tontineId);
-    const participantIds = new Set(participants.map((p) => p.userId));
-
     if (participants.length !== tontine.maxParticipants) {
       throw new BadRequestException(
         `Il manque des participants : ${participants.length}/${tontine.maxParticipants} inscrits`,
       );
     }
-
-    if (orderedUserIds.length !== participants.length) {
+    const missing = participants.find((p) => p.proposedOrder === null);
+    if (missing) {
       throw new BadRequestException(
-        'La liste doit contenir exactement tous les participants, chacun une seule fois',
+        'Propose un calendrier complet avant de le finaliser',
       );
     }
-    const seen = new Set<string>();
-    for (const uid of orderedUserIds) {
-      if (!participantIds.has(uid) || seen.has(uid)) {
-        throw new BadRequestException('Liste de participants invalide');
-      }
-      seen.add(uid);
-    }
 
-    for (let i = 0; i < orderedUserIds.length; i++) {
+    for (const p of participants) {
       await this.participantsRepository.update(
-        { tontineId, userId: orderedUserIds[i] },
-        { confirmedOrder: i + 1 },
+        { tontineId, userId: p.userId },
+        { confirmedOrder: p.proposedOrder },
       );
     }
 
-    const roundsCount = orderedUserIds.length;
+    const roundsCount = participants.length;
     const contributions: TontineContribution[] = [];
     for (let round = 1; round <= roundsCount; round++) {
-      for (const uid of orderedUserIds) {
+      for (const p of participants) {
         contributions.push(
           this.contributionsRepository.create({
             tontineId,
             roundNumber: round,
-            participantId: uid,
+            participantId: p.userId,
             status: ContributionStatus.PENDING,
           }),
         );
@@ -170,7 +238,6 @@ export class TontinesService {
     tontine.status = TontineStatus.ACTIVE;
     return this.tontinesRepository.save(tontine);
   }
-
   async findContributions(tontineId: string, round?: number): Promise<TontineContribution[]> {
     const query = this.contributionsRepository
       .createQueryBuilder('contribution')

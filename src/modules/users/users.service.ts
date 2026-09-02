@@ -159,4 +159,7 @@ export class UsersService {
   async updatePushToken(userId: string, pushToken: string): Promise<void> {
     await this.usersRepository.update({ id: userId }, { pushToken });
   }
+    async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    await this.usersRepository.update({ id: userId }, { passwordHash });
+  }
 }

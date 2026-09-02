@@ -1,7 +1,14 @@
-import { IsInt, IsPositive } from 'class-validator';
+import { IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
-export class ProposeOrderDto {
-  @IsInt()
-  @IsPositive()
-  proposedOrder!: number;
+class OrderAssignment {
+  userId!: string;
+  order!: number;
+}
+
+export class ProposeCalendarDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderAssignment)
+  assignments!: OrderAssignment[];
 }

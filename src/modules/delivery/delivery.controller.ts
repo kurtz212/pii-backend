@@ -101,6 +101,14 @@ export class DeliveryController {
   ) {
     return this.deliveryService.markAsCompleted(requestId, user.userId);
   }
+  
+    @Get(':id/contact')
+  async getContact(
+    @Param('id') requestId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.deliveryService.getContactInfo(requestId, user.userId);
+  }
 
   @Post(':id/assign')
   async assign(
