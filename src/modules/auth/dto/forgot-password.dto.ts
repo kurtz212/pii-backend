@@ -1,10 +1,14 @@
-import { IsIn, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class ForgotPasswordDto {
-  @IsString()
-  @IsNotEmpty()
-  phone!: string;
-
   @IsIn(['email', 'sms'])
   channel!: 'email' | 'sms';
+
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @IsEmail()
+  @IsOptional()
+  email?: string;
 }

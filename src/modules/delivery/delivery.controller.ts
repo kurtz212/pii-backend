@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Get,
@@ -13,8 +13,9 @@ import { DeliveryService } from './delivery.service';
 import { CreateDeliveryRequestDto } from './dto/create-delivery-request.dto';
 import { CreateDeliveryOfferDto } from './dto/create-delivery-offer.dto';
 import { CreateDeliveryReviewDto } from './dto/create-delivery-review.dto';
+import { CreateGroupedDeliveryDto } from './dto/create-grouped-delivery.dto';
 import { AssignLivreurDto } from './dto/assign-livreur.dto';
-
+import { AddTrackingStepDto } from './dto/add-tracking-step.dto';
 interface AuthenticatedUser {
   userId: string;
   phone: string;
@@ -31,6 +32,14 @@ export class DeliveryController {
     @Body() dto: CreateDeliveryRequestDto,
   ) {
     return this.deliveryService.createRequest(user.userId, dto);
+  }
+
+  @Post('grouped')
+  async createGrouped(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateGroupedDeliveryDto,
+  ) {
+    return this.deliveryService.createGroupedRequest(user.userId, dto);
   }
 
   @Get('open')
@@ -101,14 +110,6 @@ export class DeliveryController {
   ) {
     return this.deliveryService.markAsCompleted(requestId, user.userId);
   }
-  
-    @Get(':id/contact')
-  async getContact(
-    @Param('id') requestId: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    return this.deliveryService.getContactInfo(requestId, user.userId);
-  }
 
   @Post(':id/assign')
   async assign(
@@ -117,5 +118,22 @@ export class DeliveryController {
     @Body() dto: AssignLivreurDto,
   ) {
     return this.deliveryService.assignToLivreur(requestId, user.userId, dto.livreurId);
+  }
+
+  @Post(':id/tracking')
+  async addTrackingStep(
+    @Param('id') requestId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AddTrackingStepDto,
+  ) {
+    return this.deliveryService.addTrackingStep(requestId, user.userId, dto.step, dto.note);
+  }
+
+  @Get(':id/contact')
+  async getContact(
+    @Param('id') requestId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.deliveryService.getContactInfo(requestId, user.userId);
   }
 }

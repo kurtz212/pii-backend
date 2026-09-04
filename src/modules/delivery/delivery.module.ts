@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DeliveryRequest } from './delivery-request.entity';
 import { DeliveryOffer } from './delivery-offer.entity';
@@ -11,6 +11,7 @@ import { DeliveryTeamController } from './delivery-team.controller';
 import { TeamInvitesController } from './team-invites.controller';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { OrdersModule } from '../orders/orders.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ]),
     UsersModule,
     NotificationsModule,
+    OrdersModule,
   ],
   controllers: [DeliveryController, DeliveryTeamController, TeamInvitesController],
   providers: [DeliveryService],

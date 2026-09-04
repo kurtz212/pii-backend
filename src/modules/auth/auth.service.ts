@@ -51,24 +51,22 @@ export class AuthService {
   }
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ sent: boolean }> {
-    const user = await this.usersService.findByPhone(dto.phone);
-
-    // Même réponse que le numéro existe ou non — évite de révéler
-    // quels numéros sont inscrits (comme pour la connexion).
-    if (!user) {
-      return { sent: true };
-    }
-
     if (dto.channel === 'sms') {
       throw new BadRequestException(
         'La réinitialisation par SMS n\'est pas encore disponible. Utilise l\'email pour l\'instant.',
       );
     }
 
-    if (!user.email) {
-      throw new BadRequestException(
-        'Aucun email enregistré sur ce compte. Ajoute un email dans ton profil, ou contacte le support.',
-      );
+    if (!dto.email) {
+      throw new BadRequestException('Indique ton adresse email');
+    }
+
+    const user = await this.usersService.findByEmail(dto.email);
+
+    // Même réponse que l'email existe ou non — évite de révéler
+    // quels emails sont inscrits.
+    if (!user) {
+      return { sent: true };
     }
 
     if (!this.emailService.isConfigured) {
@@ -85,13 +83,17 @@ export class AuthService {
     });
     await this.resetCodesRepository.save(resetCode);
 
-    await this.emailService.sendPasswordResetCode(user.email, code);
+    await this.emailService.sendPasswordResetCode(user.email!, code);
 
     return { sent: true };
   }
 
-  async resetPassword(dto: ResetPasswordDto): Promise<{ success: boolean }> {
-    const user = await this.usersService.findByPhone(dto.phone);
+   async resetPassword(dto: ResetPasswordDto): Promise<{ success: boolean }> {
+    const user = dto.email
+      ? await this.usersService.findByEmail(dto.email)
+      : dto.phone
+        ? await this.usersService.findByPhone(dto.phone)
+        : null;
     if (!user) {
       throw new BadRequestException('Code invalide ou expiré');
     }

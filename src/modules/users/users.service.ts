@@ -162,4 +162,7 @@ export class UsersService {
     async updatePassword(userId: string, passwordHash: string): Promise<void> {
     await this.usersRepository.update({ id: userId }, { passwordHash });
   }
+    async findByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findOne({ where: { email } });
+  }
 }

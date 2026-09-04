@@ -1,9 +1,13 @@
-import { IsNotEmpty, IsString, Length, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, Length, MinLength } from 'class-validator';
 
 export class ResetPasswordDto {
   @IsString()
-  @IsNotEmpty()
-  phone!: string;
+  @IsOptional()
+  phone?: string;
+
+  @IsEmail()
+  @IsOptional()
+  email?: string;
 
   @IsString()
   @Length(6, 6, { message: 'Le code doit contenir 6 chiffres' })

@@ -18,7 +18,8 @@ import { Espace } from '../espaces/espace.entity';
 import { EspaceType } from '../espaces/espace-type.enum';
 import { UsersService } from '../users/users.service';
 import { NotificationsService } from '../notifications/notifications.service';
-
+import { OrdersService } from '../orders/orders.service';
+import { CreateGroupedDeliveryDto } from './dto/create-grouped-delivery.dto';
 export interface DeliveryBadgeInfo {
   completedDeliveries: number;
   averageRating: number | null;
@@ -38,8 +39,9 @@ export class DeliveryService {
     private readonly agencyMembersRepository: Repository<DeliveryAgencyMember>,
     @InjectRepository(Espace)
     private readonly espacesRepository: Repository<Espace>,
-    private readonly usersService: UsersService,
+      private readonly usersService: UsersService,
     private readonly notificationsService: NotificationsService,
+    private readonly ordersService: OrdersService,
   ) {}
 
   async createRequest(
@@ -55,6 +57,7 @@ export class DeliveryService {
       isFragile: dto.isFragile ?? false,
       status: DeliveryRequestStatus.OPEN,
     });
+
     const saved = await this.requestsRepository.save(request);
 
     const agencies = await this.espacesRepository.find({
@@ -68,6 +71,77 @@ export class DeliveryService {
         ownerId,
         'Nouvelle demande de livraison',
         `${dto.depart} vers ${dto.destination}`,
+      );
+    }
+
+    return saved;
+  }
+
+  // Le client regroupe plusieurs commandes (de boutiques différentes)
+  // en une seule demande de livraison — un point de collecte par
+  // commande, une seule destination finale.
+  async createGroupedRequest(
+    clientId: string,
+    dto: CreateGroupedDeliveryDto,
+  ): Promise<DeliveryRequest> {
+    const uniqueOrderIds = [...new Set(dto.orderIds)];
+    if (uniqueOrderIds.length < 2) {
+      throw new BadRequestException('Une livraison groupée nécessite au moins 2 commandes distinctes');
+    }
+
+    const pickupPoints: {
+      espaceId: string;
+      espaceName: string;
+      location: string | null;
+      orderId: string;
+      title: string;
+    }[] = [];
+
+    for (const orderId of uniqueOrderIds) {
+      const order = await this.ordersService.findOne(orderId);
+      if (order.clientId !== clientId) {
+        throw new ForbiddenException('Une des commandes sélectionnées ne t\'appartient pas');
+      }
+      if (order.status === 'cancelled') {
+        throw new BadRequestException('Une des commandes sélectionnées a été annulée');
+      }
+
+      const espace = await this.espacesRepository.findOne({ where: { id: order.espaceId } });
+      if (!espace) {
+        throw new NotFoundException('Boutique introuvable pour une des commandes');
+      }
+
+      pickupPoints.push({
+        espaceId: espace.id,
+        espaceName: espace.name,
+        location: espace.location,
+        orderId: order.id,
+        title: order.title,
+      });
+    }
+
+    const request = this.requestsRepository.create({
+      clientId,
+      depart: `${pickupPoints.length} boutiques à collecter`,
+      destination: dto.destination,
+      notes: dto.notes ?? null,
+      packageSize: dto.packageSize ?? null,
+      isFragile: dto.isFragile ?? false,
+      isGrouped: true,
+      pickupPoints,
+      status: DeliveryRequestStatus.OPEN,
+    });
+    const saved = await this.requestsRepository.save(request);
+
+    const agencies = await this.espacesRepository.find({
+      where: { type: EspaceType.AGENCE_LIVRAISON },
+    });
+    const ownerIds = [...new Set(agencies.map((a) => a.ownerId))].filter((id) => id !== clientId);
+    for (const ownerId of ownerIds) {
+      this.notificationsService.send(
+        ownerId,
+        'Nouvelle demande de livraison groupée',
+        `${pickupPoints.length} boutiques vers ${dto.destination}`,
       );
     }
 
@@ -361,6 +435,58 @@ export class DeliveryService {
     }
     request.status = DeliveryRequestStatus.COMPLETED;
     return this.requestsRepository.save(request);
+  }
+
+  async addTrackingStep(
+    requestId: string,
+    requesterId: string,
+    step: string,
+    note?: string,
+  ): Promise<DeliveryRequest> {
+    const request = await this.findRequestById(requestId);
+    if (request.status !== DeliveryRequestStatus.ASSIGNED) {
+      throw new BadRequestException('Le suivi n\'est disponible que pour une livraison en cours');
+    }
+    if (!request.acceptedOfferId) {
+      throw new BadRequestException('Aucune offre acceptée pour cette livraison');
+    }
+    const offer = await this.offersRepository.findOne({
+      where: { id: request.acceptedOfferId },
+    });
+    if (!offer) {
+      throw new NotFoundException('Offre acceptée introuvable');
+    }
+    const providerId = request.assignedLivreurId ?? offer.providerId;
+    if (requesterId !== providerId) {
+      throw new ForbiddenException('Seul le livreur en charge peut mettre à jour le suivi');
+    }
+
+    const steps = request.trackingSteps ?? [];
+    const last = steps[steps.length - 1];
+    if (last?.step === step) {
+      throw new BadRequestException('Cette étape a déjà été enregistrée en dernier');
+    }
+
+    steps.push({ step, note: note ?? null, at: new Date().toISOString() });
+    request.trackingSteps = steps;
+    const saved = await this.requestsRepository.save(request);
+
+    this.notificationsService.send(
+      request.clientId,
+      'Suivi de livraison mis à jour',
+      this.trackingStepLabel(step),
+    );
+
+    return saved;
+  }
+
+  private trackingStepLabel(step: string): string {
+    const labels: Record<string, string> = {
+      picked_up: 'Ton colis a été récupéré.',
+      in_transit: 'Ton colis est en route.',
+      delivered: 'Ton colis a été livré !',
+    };
+    return labels[step] ?? step;
   }
 
   async createReview(clientId: string, dto: CreateDeliveryReviewDto): Promise<DeliveryReview> {
