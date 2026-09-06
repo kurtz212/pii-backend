@@ -31,8 +31,13 @@ export class Espace {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @Column({ type: 'varchar', length: 150, nullable: true })
+   @Column({ type: 'varchar', length: 150, nullable: true })
   location: string | null;
+
+  // Chemin relatif renvoyé par POST /uploads/image — logo/photo de
+  // profil de l'espace, affiché dans l'Annuaire et le profil public.
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  photoUrl: string | null;
 
   @Column({ type: 'jsonb', default: {} })
   details: Record<string, unknown>;

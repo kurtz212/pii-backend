@@ -39,17 +39,17 @@ export class EspacesService {
       await this.usersService.lockReferral(ownerId, codeSaisi);
     }
 
-    const espace = this.espacesRepository.create({
+     const espace = this.espacesRepository.create({
       ownerId,
       type: dto.type,
       name: dto.name,
       description: dto.description ?? null,
       location: dto.location ?? null,
+      photoUrl: dto.photoUrl ?? null,
       details: dto.details ?? {},
       affiliationCodeUsed: codeSaisi,
       subscriptionActive: false,
     });
-
     return this.espacesRepository.save(espace);
   }
 
@@ -94,14 +94,14 @@ export class EspacesService {
   async update(
     id: string,
     ownerId: string,
-    dto: { description?: string; location?: string; details?: Record<string, unknown> },
+    dto: { name?: string; description?: string; location?: string; photoUrl?: string; details?: Record<string, unknown> },
   ): Promise<Espace> {
     const espace = await this.findOwnedEspace(id, ownerId);
-
+    if (dto.name !== undefined && dto.name.trim().length > 0) espace.name = dto.name.trim();
     if (dto.description !== undefined) espace.description = dto.description;
     if (dto.location !== undefined) espace.location = dto.location;
+    if (dto.photoUrl !== undefined) espace.photoUrl = dto.photoUrl;
     if (dto.details) espace.details = { ...espace.details, ...dto.details };
-
     return this.espacesRepository.save(espace);
   }
 }

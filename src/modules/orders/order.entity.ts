@@ -48,6 +48,9 @@ export class Order {
   @Column('numeric', { precision: 12, scale: 2 })
   price: number;
 
+  @Column({ type: 'int', default: 1 })
+  quantity: number;
+
   @Column({ type: 'enum', enum: PaymentMethod })
   paymentMethod: PaymentMethod;
 

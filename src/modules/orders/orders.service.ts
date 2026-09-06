@@ -45,13 +45,14 @@ export class OrdersService {
       );
     }
 
-    const order = this.ordersRepository.create({
+     const order = this.ordersRepository.create({
       clientId,
       publicationId: publication.id,
       espaceId: publication.espaceId,
       sellerId: publication.espace.ownerId,
       title: publication.title,
       price: publication.price,
+      quantity: dto.quantity ?? 1,
       paymentMethod: dto.paymentMethod,
       receptionMode: dto.receptionMode,
       notes: dto.notes ?? null,

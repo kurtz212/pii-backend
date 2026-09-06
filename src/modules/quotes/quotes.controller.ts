@@ -4,7 +4,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { QuotesService } from './quotes.service';
 import { CreateQuoteRequestDto } from './dto/create-quote-request.dto';
 import { SubmitQuoteDto } from './dto/submit-quote.dto';
-
+import { AddQuoteTrackingStepDto } from './dto/add-quote-tracking-step.dto';
 interface AuthenticatedUser {
   userId: string;
   phone: string;
@@ -71,5 +71,14 @@ export class QuotesController {
   @Post(':id/complete')
   async complete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.quotesService.completeRequest(id, user.userId);
+  }
+
+  @Post(':id/tracking')
+  async addTrackingStep(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AddQuoteTrackingStepDto,
+  ) {
+    return this.quotesService.addTrackingStep(id, user.userId, dto.step, dto.note);
   }
 }

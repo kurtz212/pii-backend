@@ -19,10 +19,13 @@ export class CreateEspaceDto {
   @IsOptional()
   description?: string;
 
-  @IsString()
+   @IsString()
   @IsOptional()
   location?: string;
 
+  @IsString()
+  @IsOptional()
+  photoUrl?: string;
   @IsObject()
   @IsOptional()
   details?: Record<string, unknown>;

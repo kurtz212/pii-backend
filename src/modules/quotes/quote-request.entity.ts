@@ -45,8 +45,13 @@ export class QuoteRequest {
   @Column({ type: 'enum', enum: QuoteRequestStatus, default: QuoteRequestStatus.OPEN })
   status: QuoteRequestStatus;
 
-  @Column({ type: 'uuid', nullable: true })
+    @Column({ type: 'uuid', nullable: true })
   acceptedQuoteId: string | null;
+
+  // Historique des étapes réelles du transport, mises à jour par
+  // l'agence — récupéré, en transit, dédouanement, livré.
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  trackingSteps: { step: string; note: string | null; at: string }[];
 
   @CreateDateColumn()
   createdAt: Date;

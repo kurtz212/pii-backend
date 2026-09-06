@@ -240,6 +240,7 @@ export class QuotesService {
       where: { id: request.acceptedQuoteId },
       relations: ['espace'],
     });
+    
     if (!acceptedQuote) {
       throw new NotFoundException('Devis accepte introuvable');
     }
@@ -264,5 +265,50 @@ export class QuotesService {
       return { name: client.fullName, phone: client.phone, role: 'client' };
     }
     throw new ForbiddenException('Tu n\'es pas concerne par cette demande');
+  }
+
+  async addTrackingStep(
+    requestId: string,
+    requesterId: string,
+    step: string,
+    note?: string,
+  ): Promise<QuoteRequest> {
+    const request = await this.findOne(requestId);
+    if (request.status !== QuoteRequestStatus.ACCEPTED) {
+      throw new BadRequestException('Le suivi n\'est disponible que pour un devis accepté');
+    }
+    if (!request.acceptedQuoteId) {
+      throw new BadRequestException('Aucun devis accepté pour cette demande');
+    }
+    const acceptedQuote = await this.quotesRepository.findOne({
+      where: { id: request.acceptedQuoteId },
+      relations: ['espace'],
+    });
+    if (!acceptedQuote) {
+      throw new NotFoundException('Devis accepté introuvable');
+    }
+    if (requesterId !== acceptedQuote.espace.ownerId) {
+      throw new ForbiddenException('Seule l\'agence en charge peut mettre à jour le suivi');
+    }
+
+    const steps = request.trackingSteps ?? [];
+    const last = steps[steps.length - 1];
+    if (last?.step === step) {
+      throw new BadRequestException('Cette étape a déjà été enregistrée en dernier');
+    }
+
+    steps.push({ step, note: note ?? null, at: new Date().toISOString() });
+    request.trackingSteps = steps;
+    const saved = await this.requestsRepository.save(request);
+
+    const labels: Record<string, string> = {
+      picked_up: 'Ton colis a été récupéré.',
+      in_transit: 'Ton colis est en transit.',
+      customs: 'Ton colis est en dédouanement.',
+      delivered: 'Ton colis a été livré !',
+    };
+    this.notificationsService.send(request.clientId, 'Suivi de colis mis à jour', labels[step] ?? step);
+
+    return saved;
   }
 }
