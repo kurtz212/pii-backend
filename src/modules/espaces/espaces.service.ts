@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Espace } from './espace.entity';
+import { EspaceSubscription } from './espace-subscription.entity';
 import { CreateEspaceDto } from './dto/create-espace.dto';
 import { UsersService } from '../users/users.service';
 
@@ -10,6 +11,8 @@ export class EspacesService {
   constructor(
     @InjectRepository(Espace)
     private readonly espacesRepository: Repository<Espace>,
+    @InjectRepository(EspaceSubscription)
+    private readonly subscriptionsRepository: Repository<EspaceSubscription>,
     private readonly usersService: UsersService,
   ) {}
 
@@ -103,5 +106,43 @@ export class EspacesService {
     if (dto.photoUrl !== undefined) espace.photoUrl = dto.photoUrl;
     if (dto.details) espace.details = { ...espace.details, ...dto.details };
     return this.espacesRepository.save(espace);
+  }
+
+  async subscribe(espaceId: string, userId: string): Promise<{ subscribed: boolean }> {
+    await this.findOne(espaceId);
+
+    const existingSubscription = await this.subscriptionsRepository.findOne({
+      where: { espaceId, userId },
+    });
+
+    if (!existingSubscription) {
+      const subscription = this.subscriptionsRepository.create({ espaceId, userId });
+      await this.subscriptionsRepository.save(subscription);
+    }
+
+    return { subscribed: true };
+  }
+
+  async unsubscribe(espaceId: string, userId: string): Promise<{ subscribed: boolean }> {
+    await this.findOne(espaceId);
+    await this.subscriptionsRepository.delete({ espaceId, userId });
+    return { subscribed: false };
+  }
+
+  async isSubscribed(espaceId: string, userId: string): Promise<boolean> {
+    await this.findOne(espaceId);
+    const subscription = await this.subscriptionsRepository.findOne({
+      where: { espaceId, userId },
+    });
+    return Boolean(subscription);
+  }
+
+  async findSubscriberIds(espaceId: string): Promise<string[]> {
+    await this.findOne(espaceId);
+    const subscriptions = await this.subscriptionsRepository.find({
+      where: { espaceId },
+      select: ['userId'],
+    });
+    return subscriptions.map(({ userId }) => userId);
   }
 }

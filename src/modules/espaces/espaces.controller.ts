@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Delete,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -54,5 +55,21 @@ export class EspacesController {
     @Body() dto: UpdateEspaceDto,
   ) {
     return this.espacesService.update(id, user.userId, dto);
+  }
+
+  @Post(':id/subscribe')
+  async subscribe(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.espacesService.subscribe(id, user.userId);
+  }
+
+  @Delete(':id/subscribe')
+  async unsubscribe(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.espacesService.unsubscribe(id, user.userId);
+  }
+
+  @Get(':id/subscribe/status')
+  async subscribeStatus(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const subscribed = await this.espacesService.isSubscribed(id, user.userId);
+    return { subscribed };
   }
 }

@@ -5,6 +5,7 @@ import { Publication } from './publication.entity';
 import { CreatePublicationDto } from './dto/create-publication.dto';
 import { UpdatePublicationDto } from './dto/update-publication.dto';
 import { EspacesService } from '../espaces/espaces.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PublicationsService {
@@ -12,11 +13,11 @@ export class PublicationsService {
     @InjectRepository(Publication)
     private readonly publicationsRepository: Repository<Publication>,
     private readonly espacesService: EspacesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(userId: string, dto: CreatePublicationDto): Promise<Publication> {
-    await this.espacesService.findOwnedEspace(dto.espaceId, userId);
-
+    const espace = await this.espacesService.findOwnedEspace(dto.espaceId, userId);
     const publication = this.publicationsRepository.create({
       espaceId: dto.espaceId,
       contentType: dto.contentType,
@@ -28,8 +29,14 @@ export class PublicationsService {
       imageUrl: dto.imageUrl ?? null,
       videoUrl: dto.videoUrl ?? null,
     });
+    const saved = await this.publicationsRepository.save(publication);
 
-    return this.publicationsRepository.save(publication);
+    const subscriberIds = await this.espacesService.findSubscriberIds(dto.espaceId);
+    for (const subscriberId of subscriberIds) {
+      this.notificationsService.send(subscriberId, `${espace.name} a publié`, dto.title);
+    }
+
+    return saved;
   }
 
   async findFeed(espaceId?: string): Promise<Publication[]> {
@@ -48,10 +55,7 @@ export class PublicationsService {
 
   async findMyPublications(espaceId: string, ownerId: string): Promise<Publication[]> {
     await this.espacesService.findOwnedEspace(espaceId, ownerId);
-    return this.publicationsRepository.find({
-      where: { espaceId },
-      order: { createdAt: 'DESC' },
-    });
+    return this.publicationsRepository.find({ where: { espaceId }, order: { createdAt: 'DESC' } });
   }
 
   async findOne(id: string): Promise<Publication> {
