@@ -1,12 +1,16 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsObject, IsOptional, IsString } from 'class-validator';
 import { MessageType } from '../message-type.enum';
 
 export class SendMessageDto {
   @IsString()
-  @IsNotEmpty()
-  content!: string;
+  @IsOptional()
+  content?: string;
 
   @IsEnum(MessageType)
   @IsOptional()
   type?: MessageType;
+
+  @IsObject()
+  @IsOptional()
+  metadata?: Record<string, unknown>;
 }

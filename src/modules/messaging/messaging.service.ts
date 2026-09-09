@@ -124,11 +124,12 @@ export class MessagingService {
   ): Promise<Message> {
     const conversation = await this.assertParticipant(conversationId, senderId);
 
-    const message = this.messagesRepository.create({
+        const message = this.messagesRepository.create({
       conversationId,
       senderId,
-      content: dto.content,
+      content: dto.content ?? '',
       type: dto.type ?? MessageType.TEXT,
+      metadata: dto.metadata ?? null,
     });
     const saved = await this.messagesRepository.save(message);
 
@@ -136,6 +137,18 @@ export class MessagingService {
       { id: conversationId },
       { lastMessageAt: saved.createdAt },
     );
+
+    const notificationLabels: Record<string, string> = {
+      image: 'Photo',
+      video: 'Vidéo',
+      audio: 'Message vocal',
+      location: 'Position partagée',
+      contact: 'Contact partagé',
+      file: 'Fichier',
+    };
+    const messageType = dto.type ?? MessageType.TEXT;
+    const notificationBody =
+      messageType === MessageType.TEXT ? dto.content ?? '' : notificationLabels[messageType] ?? 'Nouveau message';
 
     const recipientId =
       conversation.participantOneId === senderId
@@ -145,7 +158,7 @@ export class MessagingService {
     this.notificationsService.send(
       recipientId,
       sender?.fullName ?? 'Nouveau message',
-      dto.type === 'text' ? dto.content : 'Vous avez reçu un nouveau message',
+      notificationBody,
     );
 
     return saved;
