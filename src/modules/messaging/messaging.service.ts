@@ -56,8 +56,8 @@ export class MessagingService {
     return this.conversationsRepository.save(conversation);
   }
 
-  async findMyConversations(userId: string): Promise<Conversation[]> {
-    return this.conversationsRepository
+   async findMyConversations(userId: string): Promise<(Conversation & { unreadCount: number })[]> {
+    const conversations = await this.conversationsRepository
       .createQueryBuilder('conversation')
       .leftJoinAndSelect('conversation.participantOne', 'participantOne')
       .leftJoinAndSelect('conversation.participantTwo', 'participantTwo')
@@ -67,6 +67,19 @@ export class MessagingService {
       .orderBy('conversation.lastMessageAt', 'DESC', 'NULLS LAST')
       .addOrderBy('conversation.createdAt', 'DESC')
       .getMany();
+
+      const results: (Conversation & { unreadCount: number })[] = [];
+    for (const conversation of conversations) {
+      const unreadCount = await this.messagesRepository
+        .createQueryBuilder('message')
+        .where('message.conversationId = :conversationId', { conversationId: conversation.id })
+        .andWhere('message.senderId != :userId', { userId })
+        .andWhere('message.isRead = false')
+        .getCount();
+      results.push({ ...conversation, unreadCount });
+    }
+
+    return results;
   }
 
   private async assertParticipant(conversationId: string, userId: string): Promise<Conversation> {
@@ -82,12 +95,23 @@ export class MessagingService {
     return conversation;
   }
 
-  async findMessages(conversationId: string, userId: string): Promise<MessageWithTranslation[]> {
+    async findMessages(conversationId: string, userId: string): Promise<MessageWithTranslation[]> {
     await this.assertParticipant(conversationId, userId);
     const messages = await this.messagesRepository.find({
       where: { conversationId },
       order: { createdAt: 'ASC' },
     });
+
+    // Marque comme lus tous les messages reçus (pas envoyés par
+    // soi-même) dès que la conversation est ouverte.
+    await this.messagesRepository
+      .createQueryBuilder()
+      .update()
+      .set({ isRead: true })
+      .where('conversationId = :conversationId', { conversationId })
+      .andWhere('senderId != :userId', { userId })
+      .andWhere('isRead = false')
+      .execute();
 
     const reader = await this.usersService.findById(userId);
     const readerLang = reader?.preferredTextLanguage ?? 'fr';

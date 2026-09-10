@@ -165,4 +165,9 @@ export class UsersService {
     async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { email } });
   }
+    async setIsLivreur(userId: string, isLivreur: boolean): Promise<void> {
+    await this.usersRepository.update({ id: userId }, { isLivreur });
+  }
+
+  
 }

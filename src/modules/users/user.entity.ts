@@ -53,8 +53,15 @@ export class User {
   @Column({ type: 'varchar', length: 5, nullable: true })
   preferredAudioLanguage: string | null;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+    @Column({ type: 'varchar', length: 255, nullable: true })
   pushToken: string | null;
+
+  // Statut activable par l'utilisateur lui-même — determine s'il voit
+  // les demandes de livraison ouvertes dans l'onglet Livrer. Les
+  // proprietaires d'agence de livraison y ont accès automatiquement,
+  // sans avoir besoin de ce statut.
+  @Column({ default: false })
+  isLivreur: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

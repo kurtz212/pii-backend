@@ -42,12 +42,13 @@ export class DeliveryController {
     return this.deliveryService.createGroupedRequest(user.userId, dto);
   }
 
-  @Get('open')
+   @Get('open')
   async findOpen(
     @CurrentUser() user: AuthenticatedUser,
     @Query('excludeMine') excludeMine?: string,
   ) {
     return this.deliveryService.findOpenRequests(
+      user.userId,
       excludeMine === 'true' ? user.userId : undefined,
     );
   }

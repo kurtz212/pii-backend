@@ -148,7 +148,21 @@ export class DeliveryService {
     return saved;
   }
 
-  async findOpenRequests(excludeClientId?: string): Promise<DeliveryRequest[]> {
+  // Seuls les livreurs (statut activé) ou les propriétaires d'agence
+  // de livraison voient les demandes ouvertes — pas n'importe quel
+  // utilisateur.
+  async findOpenRequests(requesterId: string, excludeClientId?: string): Promise<DeliveryRequest[]> {
+    const requester = await this.usersService.findById(requesterId);
+    const ownsAgency = await this.espacesRepository.findOne({
+      where: { ownerId: requesterId, type: EspaceType.AGENCE_LIVRAISON },
+    });
+
+    if (!requester?.isLivreur && !ownsAgency) {
+      throw new ForbiddenException(
+        'Active le statut "Je suis livreur" ou crée une agence de livraison pour voir les demandes',
+      );
+    }
+
     const query = this.requestsRepository
       .createQueryBuilder('request')
       .where('request.status = :status', { status: DeliveryRequestStatus.OPEN })

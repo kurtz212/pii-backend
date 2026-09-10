@@ -13,8 +13,18 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ALLOWED_VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska'];
+const ALLOWED_DOCUMENT_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+  'text/plain',
+];
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
+const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024;
 
 @Controller('uploads')
 @UseGuards(JwtAuthGuard)
@@ -71,5 +81,35 @@ export class UploadsController {
       throw new BadRequestException('Aucun fichier reçu');
     }
     return { url: `/uploads/${file.filename}` };
+  }
+
+  @Post('file')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (_req, file, callback) => {
+          const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+          callback(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+      limits: { fileSize: MAX_DOCUMENT_SIZE_BYTES },
+      fileFilter: (_req, file, callback) => {
+        if (!ALLOWED_DOCUMENT_MIME_TYPES.includes(file.mimetype)) {
+          callback(
+            new BadRequestException('Format de fichier non supporté (PDF, Word, Excel, ZIP ou texte uniquement)'),
+            false,
+          );
+          return;
+        }
+        callback(null, true);
+      },
+    }),
+  )
+  uploadFile(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Aucun fichier reçu');
+    }
+    return { url: `/uploads/${file.filename}`, fileName: file.originalname, fileSize: file.size };
   }
 }

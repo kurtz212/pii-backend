@@ -60,6 +60,16 @@ export class UsersController {
     return { success: true };
   }
 
+  @Patch('me/livreur-status')
+  @UseGuards(JwtAuthGuard)
+  async setIsLivreur(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { isLivreur: boolean },
+  ) {
+    await this.usersService.setIsLivreur(user.userId, body.isLivreur);
+    return { success: true };
+  }
+
   @Get('search')
   @UseGuards(JwtAuthGuard)
   async search(@CurrentUser() user: AuthenticatedUser, @Query('q') q: string) {
