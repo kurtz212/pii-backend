@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateLanguagePreferencesDto } from './dto/update-language-preferences.dto';
 import { UpdatePushTokenDto } from './dto/update-push-token.dto';
-
+import { Delete } from '@nestjs/common';
 interface AuthenticatedUser {
   userId: string;
   phone: string;
@@ -53,10 +53,24 @@ export class UsersController {
     );
   }
 
+  @Post('me/claim-affiliation-code')
+  @UseGuards(JwtAuthGuard)
+  async claimAffiliationCode(@CurrentUser() user: AuthenticatedUser) {
+    const updated = await this.usersService.claimAffiliationCode(user.userId);
+    return { affiliationCode: updated.affiliationCode };
+  }
+
   @Patch('me/push-token')
   @UseGuards(JwtAuthGuard)
   async updatePushToken(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdatePushTokenDto) {
     await this.usersService.updatePushToken(user.userId, dto.pushToken);
+    return { success: true };
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  async deleteAccount(@CurrentUser() user: AuthenticatedUser) {
+    await this.usersService.deleteAccount(user.userId);
     return { success: true };
   }
 

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -26,20 +26,19 @@ export class UsersService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-    const affiliationCode = await this.generateUniqueAffiliationCode(dto.fullName);
 
     const user = this.usersRepository.create({
       fullName: dto.fullName,
       phone: dto.phone,
       email: dto.email ?? null,
       passwordHash,
-      affiliationCode,
+      affiliationCode: '0000',
     });
 
     return this.usersRepository.save(user);
   }
 
-  private async generateUniqueAffiliationCode(fullName: string): Promise<string> {
+  async generateUniqueAffiliationCode(fullName: string): Promise<string> {
     const base = fullName
       .trim()
       .split(/\s+/)[0]
@@ -168,6 +167,25 @@ export class UsersService {
     async setIsLivreur(userId: string, isLivreur: boolean): Promise<void> {
     await this.usersRepository.update({ id: userId }, { isLivreur });
   }
-
-  
+  async deleteAccount(userId: string): Promise<void> {
+    await this.usersRepository.delete({ id: userId });
+  }
+   async claimAffiliationCode(userId: string): Promise<User> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+    if (!user.mobileMoneyOperator || !user.mobileMoneyNumber) {
+      throw new BadRequestException(
+        'Renseigne ton opérateur et ton numéro mobile money avant de générer ton code',
+      );
+    }
+    if (user.affiliationCode !== '0000') {
+      return user;
+    }
+    const newCode = await this.generateUniqueAffiliationCode(user.fullName);
+    await this.usersRepository.update({ id: userId }, { affiliationCode: newCode });
+    const updated = await this.findById(userId);
+    return updated!;
+  }
 }
