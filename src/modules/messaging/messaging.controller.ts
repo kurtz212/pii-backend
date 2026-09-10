@@ -20,9 +20,14 @@ export class MessagingController {
     return this.messagingService.findOrCreateConversation(user.userId, dto.recipientId);
   }
 
-  @Get('mine')
+   @Get('mine')
   async findMine(@CurrentUser() user: AuthenticatedUser) {
     return this.messagingService.findMyConversations(user.userId);
+  }
+
+  @Get('unread-count')
+  async getUnreadCount(@CurrentUser() user: AuthenticatedUser) {
+    return this.messagingService.getTotalUnreadCount(user.userId);
   }
 
   @Get(':id/messages')

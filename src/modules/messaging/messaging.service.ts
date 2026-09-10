@@ -187,4 +187,16 @@ export class MessagingService {
 
     return saved;
   }
+  
+    async getTotalUnreadCount(userId: string): Promise<{ count: number }> {
+    const count = await this.messagesRepository
+      .createQueryBuilder('message')
+      .innerJoin('message.conversation', 'conversation')
+      .where('(conversation.participantOneId = :userId OR conversation.participantTwoId = :userId)', { userId })
+      .andWhere('message.senderId != :userId', { userId })
+      .andWhere('message.isRead = false')
+      .getCount();
+    return { count };
+  }
+
 }
