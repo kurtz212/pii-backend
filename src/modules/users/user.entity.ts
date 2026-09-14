@@ -26,9 +26,12 @@ export class User {
   @Column({ default: false })
   isPhoneVerified: boolean;
 
-  @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
+  // Plus unique en base — "0000" est un code partagé par défaut, tant
+  // que l'utilisateur n'a pas généré son propre code réel. L'unicité
+  // des vrais codes (générés) est garantie par la logique applicative
+  // (voir generateUniqueAffiliationCode), pas par la base.
+  @Column({ type: 'varchar', length: 20, nullable: true })
   affiliationCode: string | null;
-
   @Column({ type: 'varchar', length: 20, nullable: true })
   referredByCode: string | null;
 

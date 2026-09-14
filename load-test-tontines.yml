@@ -1,0 +1,43 @@
+﻿config:
+  target: "http://192.168.11.107:3000"
+  phases:
+    - duration: 30
+      arrivalRate: 2
+      name: "Montee douce"
+    - duration: 60
+      arrivalRate: 10
+      name: "Charge soutenue"
+  processor: "./load-test-processor.js"
+
+scenarios:
+  - name: "Inscription puis creation de tontine"
+    flow:
+      - function: "setPhone"
+      - post:
+          url: "/users"
+          json:
+            fullName: "TestCharge"
+            phone: "{{ phone }}"
+            password: "TestPass123"
+      - post:
+          url: "/auth/login"
+          json:
+            phone: "{{ phone }}"
+            password: "TestPass123"
+          capture:
+            - json: "$.accessToken"
+              as: "token"
+      - post:
+          url: "/tontines"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            name: "Tontine de test"
+            articleName: "Television"
+            articlePrice: 75000
+            contributionAmount: 15000
+            maxParticipants: 5
+      - get:
+          url: "/tontines/mine"
+          headers:
+            Authorization: "Bearer {{ token }}"

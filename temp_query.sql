@@ -1,1 +1,1 @@
-SELECT e.id, e.name, e.type, u.phone FROM espaces e JOIN users u ON u.id = e."ownerId" WHERE e.type IN ('agence_cargo', 'transitaire');
+SELECT id, title, price FROM publications WHERE price IS NOT NULL LIMIT 1;

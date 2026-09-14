@@ -1,0 +1,49 @@
+config:
+  target: "http://192.168.11.107:3000"
+  phases:
+    - duration: 30
+      arrivalRate: 2
+      name: "Montee douce"
+    - duration: 60
+      arrivalRate: 10
+      name: "Charge soutenue"
+  processor: "./load-test-processor.js"
+
+scenarios:
+  - name: "Inscription puis envoi de messages"
+    flow:
+      - function: "setPhone"
+      - post:
+          url: "/users"
+          json:
+            fullName: "TestCharge {{ $randomString() }}"
+            phone: "{{ phone }}"
+            password: "TestPass123"
+      - post:
+          url: "/auth/login"
+          json:
+            phone: "{{ phone }}"
+            password: "TestPass123"
+          capture:
+            - json: "$.accessToken"
+              as: "token"
+      - post:
+          url: "/conversations"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            recipientId: "68ed5535-b640-479c-8760-4bac98206bc0"
+          capture:
+            - json: "$.id"
+              as: "conversationId"
+      - post:
+          url: "/conversations/{{ conversationId }}/messages"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            content: "Message de test de charge {{ $randomString() }}"
+            type: "text"
+      - get:
+          url: "/conversations/{{ conversationId }}/messages"
+          headers:
+            Authorization: "Bearer {{ token }}"

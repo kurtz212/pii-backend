@@ -16,6 +16,13 @@ export default registerAs(
     database: process.env.DB_NAME,
     autoLoadEntities: true,
     synchronize: process.env.NODE_ENV !== 'production',
-    logging: process.env.NODE_ENV === 'development',
+    logging: false,
+    // Le pool par défaut (10 connexions) sature vite sous charge —
+    // on l'augmente largement, tout en restant bien en dessous de la
+    // limite PostgreSQL (100).
+    extra: {
+      max: 40,
+      connectionTimeoutMillis: 10000,
+    },
   }),
 );
