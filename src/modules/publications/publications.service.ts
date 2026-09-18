@@ -26,7 +26,8 @@ export class PublicationsService {
       price: dto.price ?? null,
       tranchesActivees: dto.tranchesActivees ?? false,
       presenterEnLive: dto.presenterEnLive ?? false,
-      imageUrl: dto.imageUrl ?? null,
+      imageUrl: dto.imageUrls?.[0] ?? dto.imageUrl ?? null,
+      imageUrls: dto.imageUrls ?? null,
       videoUrl: dto.videoUrl ?? null,
     });
     const saved = await this.publicationsRepository.save(publication);

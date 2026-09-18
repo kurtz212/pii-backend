@@ -44,8 +44,16 @@ export class Publication {
   @Column({ default: false })
   presenterEnLive: boolean;
 
+   // Conservé pour compatibilité avec les publications déjà créées
+  // avant le support multi-photos — représente la première image.
   @Column({ type: 'varchar', length: 255, nullable: true })
   imageUrl: string | null;
+
+  // Tableau complet des photos du carrousel (inclut la première,
+  // dupliquée avec imageUrl). Vide/null pour les anciennes
+  // publications à une seule image ou pour les vidéos.
+  @Column({ type: 'jsonb', nullable: true })
+  imageUrls: string[] | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   videoUrl: string | null;
